@@ -1,72 +1,175 @@
-// --- PRAWDZIWE ROZPOZNAWANIE AI ---
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zielony Lekarz - AI Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+        body { font-family: 'Poppins', sans-serif; background-color: #f0fdf4; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .plant-card { cursor: pointer; transition: 0.3s; background: white; border-radius: 20px; overflow: hidden; }
+        .plant-card:hover { transform: translateY(-5px); shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .scan-line { position: absolute; width: 100%; height: 4px; background: #10b981; animation: scan 2s infinite; z-index: 10; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    </style>
+</head>
+<body class="pb-20">
 
-async function identifyPlantAI(base64Image) {
-    const apiKey = "TWÓJ_KLUCZ_API"; // <--- TUTAJ WKLEJ SWÓJ KLUCZ Z PLANT.ID
-    
-    if (apiKey === "TWÓJ_KLUCZ_API") {
-        alert("BŁĄD: Nie wpisałeś klucza API w kodzie!");
-        return;
-    }
+    <!-- NAWIGACJA -->
+    <nav class="bg-emerald-900 text-white p-4 sticky top-0 z-50 flex justify-between items-center shadow-lg">
+        <div class="font-bold text-xl">🌿 Zielony Lekarz</div>
+        <div class="flex gap-4">
+            <button onclick="changeSection('home')">Biblioteka</button>
+            <button onclick="changeSection('jungle')">Dżungla</button>
+            <button onclick="changeSection('skaner')" class="bg-emerald-600 px-3 py-1 rounded-full font-bold">SKANUJ AI</button>
+        </div>
+    </nav>
 
-    const data = {
-        images: [base64Image],
-        latitude: 49.207,
-        longitude: 16.608,
-        similar_images: true,
-    };
+    <!-- WYSZUKIWARKA -->
+    <header id="main-header" class="bg-emerald-800 text-white py-12 px-4 text-center">
+        <h1 class="text-3xl font-bold mb-4">Biblioteka Roślin</h1>
+        <input type="text" id="searchInput" oninput="searchPlant()" placeholder="Szukaj rośliny (np. Storczyk)..." 
+               class="w-full max-w-md p-4 rounded-2xl text-black outline-none shadow-xl">
+    </header>
 
-    try {
-        const response = await fetch("https://plant.id/api/v3/identification", {
-            method: "POST",
-            headers: {
-                "Api-Key": apiKey,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(data),
-        });
+    <!-- KATALOG -->
+    <main id="home" class="section active container mx-auto p-6">
+        <div id="plantGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </main>
 
-        const result = await response.json();
-        processAIResult(result);
-    } catch (error) {
-        console.error("Błąd AI:", error);
-        alert("AI nie mogło przetworzyć zdjęcia. Sprawdź połączenie.");
-    }
-}
+    <!-- MOJA DŻUNGLA -->
+    <section id="jungle" class="section container mx-auto p-6">
+        <h2 class="text-2xl font-bold text-center mb-6">Moja Kolekcja ❤️</h2>
+        <div id="jungleGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
 
-function processAIResult(result) {
-    // Sprawdzamy, czy AI coś znalazło
-    if (result.suggestions && result.suggestions.length > 0) {
-        const bestMatch = result.suggestions[0];
-        const probability = Math.round(bestMatch.probability * 100);
-        
-        if (probability < 10) {
-            alert("AI mówi: To nie wygląda na roślinę! (Pewność: " + probability + "%)");
-            return;
+    <!-- SKANER -->
+    <section id="skaner" class="section container mx-auto p-6">
+        <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl p-6 text-center">
+            <h2 class="font-bold text-xl mb-4">Analiza AI (Pl@ntNet)</h2>
+            <div class="relative bg-black rounded-2xl aspect-square overflow-hidden mb-6">
+                <video id="video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                <div id="scanLine" class="hidden scan-line"></div>
+            </div>
+            <p id="statusMsg" class="text-emerald-600 font-bold mb-4"></p>
+            <button onclick="startCamera()" class="w-full bg-emerald-700 text-white py-4 rounded-2xl font-bold mb-2">WŁĄCZ APARAT</button>
+            <button onclick="identifyPlantNet()" id="btnIdentify" class="hidden w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold">ROZPOZNAJ ROŚLINĘ</button>
+        </div>
+    </section>
+
+    <script>
+        // TWOJA BAZA ROŚLIN
+        const plants = [
+            { id: 1, name: "Monstera Deliciosa", info: "Lubi rozproszone światło.", img: "https://images.pexels.com/photos/6597437/pexels-photo-6597437.jpeg?w=400" },
+            { id: 2, name: "Sansewieria", info: "Produkuje tlen w nocy. Bardzo odporna.", img: "https://images.pexels.com/photos/5858235/pexels-photo-5858235.jpeg?w=400" },
+            { id: 3, name: "Storczyk", info: "Wymaga namaczania raz w tygodniu.", img: "https://images.pexels.com/photos/1035910/pexels-photo-1035910.jpeg?w=400" },
+            { id: 4, name: "Zamiokulkas", info: "Idealny do cienia.", img: "https://images.pexels.com/photos/7513165/pexels-photo-7513165.jpeg?w=400" },
+            { id: 5, name: "Skrzydłokwiat", info: "Lubi wilgoć i półcień.", img: "https://images.pexels.com/photos/4505171/pexels-photo-4505171.jpeg?w=400" }
+        ];
+
+        let myJungle = JSON.parse(localStorage.getItem('myJungle')) || [];
+
+        function changeSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('main-header').style.display = (id === 'home') ? 'block' : 'none';
         }
 
-        const plantName = bestMatch.plant_name;
-        
-        // Wyświetlamy wynik
-        if (confirm("AI rozpoznało: " + plantName + "\nPewność: " + probability + "%\nCzy chcesz wyszukać tę roślinę w bibliotece?")) {
-            changeSection('home');
-            document.getElementById('searchInput').value = plantName;
-            renderPlants(plantName);
+        function renderPlants(filter = "") {
+            const grid = document.getElementById('plantGrid');
+            grid.innerHTML = "";
+            plants.filter(p => p.name.toLowerCase().includes(filter.toLowerCase())).forEach(p => {
+                grid.innerHTML += `
+                    <div class="plant-card shadow-lg">
+                        <img src="${p.img}" class="w-full h-48 object-cover">
+                        <div class="p-4">
+                            <h3 class="font-bold text-lg">${p.name}</h3>
+                            <p class="text-gray-500 text-sm mb-4">${p.info}</p>
+                            <button onclick="addToJungle(${p.id})" class="w-full bg-emerald-100 text-emerald-700 py-2 rounded-xl font-bold">Dodaj ❤️</button>
+                        </div>
+                    </div>`;
+            });
         }
-    } else {
-        alert("AI nie rozpoznało żadnej rośliny na tym zdjęciu.");
-    }
-}
 
-// Funkcja przechwytująca klatkę z wideo i zamieniająca na Base64
-function captureAndIdentify() {
-    const video = document.getElementById('video');
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    
-    const base64Image = canvas.toDataURL('image/jpeg');
-    
-    document.getElementById('scanLine').classList.remove('hidden');
-    identifyPlantAI(base64Image);
-}
+        function searchPlant() {
+            renderPlants(document.getElementById('searchInput').value);
+        }
+
+        function addToJungle(id) {
+            if(!myJungle.find(p => p.id === id)) {
+                myJungle.push(plants.find(p => p.id === id));
+                localStorage.setItem('myJungle', JSON.stringify(myJungle));
+                alert("Dodano do dżungli!");
+            }
+        }
+
+        function renderJungle() {
+            const grid = document.getElementById('jungleGrid');
+            grid.innerHTML = myJungle.length ? "" : "Pusto tutaj...";
+            myJungle.forEach(p => {
+                grid.innerHTML += `<div class="bg-white p-3 rounded-xl flex items-center gap-4 shadow"><img src="${p.img}" class="w-12 h-12 rounded-lg object-cover font-bold"><span>${p.name}</span></div>`;
+            });
+        }
+
+        // --- APARAT I PRAWDZIWE AI ---
+        let stream = null;
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                document.getElementById('video').srcObject = stream;
+                document.getElementById('btnIdentify').classList.remove('hidden');
+            } catch(e) { alert("Aparat wymaga HTTPS (GitHub Pages)."); }
+        }
+
+        async function identifyPlantNet() {
+            const apiKey = "TUTAJ_WKLEJ_TWOJ_KLUCZ"; // <--- TWÓJ KLUCZ Z PLANTNET
+            const video = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            const status = document.getElementById('statusMsg');
+
+            if(apiKey.includes("TUTAJ")) { alert("Wklej klucz API!"); return; }
+
+            document.getElementById('scanLine').classList.remove('hidden');
+            status.innerText = "Analizowanie liścia przez AI...";
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg'));
+            const formData = new FormData();
+            formData.append('organs', 'leaf');
+            formData.append('images', blob);
+
+            try {
+                const resp = await fetch(`https://my-api.plantnet.org/v2/identify/all?api-key=${apiKey}&lang=pl`, {
+                    method: "POST", body: formData
+                });
+                const res = await resp.json();
+                const best = res.results[0];
+                const name = best.species.commonNames[0] || best.species.scientificNameWithoutAuthor;
+                const score = (best.score * 100).toFixed(0);
+
+                if(score < 10) {
+                    alert("AI nie widzi tu rośliny (Pewność: " + score + "%)");
+                } else {
+                    if(confirm("Rozpoznano: " + name + " (" + score + "%)\nPokazać w bibliotece?")) {
+                        changeSection('home');
+                        document.getElementById('searchInput').value = name;
+                        renderPlants(name);
+                    }
+                }
+            } catch(e) { alert("Błąd połączenia z AI."); }
+            document.getElementById('scanLine').classList.add('hidden');
+            status.innerText = "";
+        }
+
+        // START
+        renderPlants();
+    </script>
+</body>
+</html>
