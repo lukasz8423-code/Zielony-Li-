@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zielony Lekarz - Edycja Ekspercka</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f3fcf4; color: #1a2e1c; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .plant-card { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); cursor: pointer; }
+        .plant-card:hover { transform: translateY(-10px); shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(10, 30, 10, 0.85); z-index: 100; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
+        .modal.active { display: flex; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #059669; border-radius: 10px; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- NAWIGACJA -->
+    <nav class="bg-[#064e3b] text-white p-5 shadow-2xl sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="text-2xl font-bold flex items-center gap-2 tracking-tight">
+                <i class="fas fa-leaf text-emerald-400"></i> Zielony Lekarz
+            </div>
+            <div class="flex gap-8 font-semibold text-sm uppercase tracking-widest">
+                <button onclick="changeSection('home')" class="hover:text-emerald-400 transition">Biblioteka</button>
+                <button onclick="changeSection('jungle')" class="hover:text-emerald-400 transition">Moja Dżungla</button>
+                <button onclick="changeSection('skaner')" class="bg-emerald-500 px-6 py-2 rounded-full hover:bg-emerald-400 shadow-lg transition">Skaner</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HEADER Z WYSZUKIWARKĄ -->
+    <header id="main-header" class="bg-[#065f46] py-20 px-6 text-center text-white">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-6">Encyklopedia Roślin Domowych</h1>
+        <div class="max-w-2xl mx-auto relative">
+            <input type="text" id="searchInput" oninput="searchPlant()" 
+                   placeholder="Szukaj po nazwie (np. Storczyk) lub cechach (np. cień)..." 
+                   class="w-full p-5 rounded-3xl text-gray-900 shadow-2xl outline-none focus:ring-4 focus:ring-emerald-300 text-lg">
+            <i class="fas fa-search absolute right-6 top-6 text-emerald-600 text-xl"></i>
+        </div>
+        <div class="mt-4 flex justify-center gap-4 text-emerald-100 text-sm italic">
+            <span>Popularne: Storczyk, Monstera, Aloes</span>
+        </div>
+    </header>
+
+    <!-- BIBLIOTEKA -->
+    <main id="home" class="section active container mx-auto p-8">
+        <div id="plantGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+            <!-- Rośliny wpadną tutaj -->
+        </div>
+        <div id="noResults" class="hidden text-center py-32">
+            <i class="fas fa-search-minus text-6xl text-emerald-200 mb-6"></i>
+            <p class="text-2xl font-bold text-emerald-900">Nie znaleźliśmy takiej rośliny...</p>
+            <p class="text-emerald-600">Spróbuj wpisać inną nazwę.</p>
+        </div>
+    </main>
+
+    <!-- MOJA DŻUNGLA -->
+    <section id="jungle" class="section container mx-auto p-8">
+        <h2 class="text-4xl font-extrabold text-center mb-12 text-emerald-900">Moja Kolekcja ❤️</h2>
+        <div id="jungleGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
+    </section>
+
+    <!-- SKANER -->
+    <section id="skaner" class="section container mx-auto p-8">
+        <div class="max-w-xl mx-auto bg-white rounded-[40px] shadow-2xl overflow-hidden p-10 border-t-[12px] border-emerald-600">
+            <h2 class="text-3xl font-extrabold mb-4 text-center">Diagnostyka AI</h2>
+            <p class="text-center text-gray-500 mb-8">Zrób zdjęcie liścia, aby rozpoznać chorobę lub gatunek.</p>
+            
+            <div class="bg-gray-900 aspect-square rounded-[30px] mb-8 relative overflow-hidden shadow-inner flex items-center justify-center">
+                <video id="video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                <div id="scanLine" class="hidden absolute inset-x-0 h-1 bg-emerald-400 shadow-[0_0_20px_#10b981] animate-bounce z-10"></div>
+                <div id="camMessage" class="absolute text-white text-center p-6 bg-black/50 inset-0 flex items-center justify-center italic text-sm">
+                    Aparat zadziała tylko na serwerze HTTPS.<br>Lokalnie użyj przycisku poniżej.
+                </div>
+            </div>
+
+            <div class="grid gap-4">
+                <button onclick="startCamera()" class="bg-emerald-700 text-white py-5 rounded-2xl font-bold text-lg hover:bg-emerald-800 transition shadow-xl">
+                    <i class="fas fa-video mr-2"></i> URUCHOM KAMERĘ
+                </button>
+                <button onclick="simulateScan()" class="bg-emerald-100 text-emerald-800 py-4 rounded-2xl font-bold border-2 border-emerald-200">
+                    <i class="fas fa-flask mr-2"></i> TESTUJ SKANOWANIE (DEMO)
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- KARTA PACJENTA (MODAL) -->
+    <div id="detailsModal" class="modal" onclick="closeModal()">
+        <div class="bg-white rounded-[40px] max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl relative flex flex-col" onclick="event.stopPropagation()">
+            <button onclick="closeModal()" class="absolute top-6 right-6 bg-black/30 text-white w-12 h-12 rounded-full z-10 hover:bg-black transition">✕</button>
+            
+            <img id="modalImg" src="" class="w-full h-72 object-cover">
+            
+            <div class="p-10 overflow-y-auto custom-scroll">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h2 id="modalName" class="text-4xl font-extrabold text-emerald-900 mb-2 font-serif">Nazwa</h2>
+                        <span id="modalDifficulty" class="px-4 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest">Trudność</span>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-bold text-gray-400 uppercase">Status</p>
+                        <p class="text-emerald-500 font-bold">Zdrowa ✓</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6 mb-8">
+                    <div class="bg-blue-50 p-5 rounded-3xl border border-blue-100">
+                        <p class="text-xs text-blue-600 font-black uppercase mb-2"><i class="fas fa-tint mr-1"></i> Nawadnianie</p>
+                        <p id="modalWater" class="text-sm font-semibold text-gray-800 leading-snug"></p>
+                    </div>
+                    <div class="bg-orange-50 p-5 rounded-3xl border border-orange-100">
+                        <p class="text-xs text-orange-600 font-black uppercase mb-2"><i class="fas fa-sun mr-1"></i> Ekspozycja</p>
+                        <p id="modalLight" class="text-sm font-semibold text-gray-800 leading-snug"></p>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <h3 class="font-bold text-lg text-emerald-900 mb-3 underline decoration-emerald-300 underline-offset-4">Szczegółowa Pielęgnacja</h3>
+                    <p id="modalDesc" class="text-gray-600 leading-relaxed text-base"></p>
+                </div>
+
+                <button id="addBtnAction" class="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-emerald-700 shadow-2xl transition transform active:scale-95">
+                    DODAJ DO MOJEJ DŻUNGLI ❤️
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const plants = [
+            { 
+                id: 1, name: "Monstera Deliciosa", difficulty: "Średnia", 
+                water: "Raz w tygodniu, obficie. Latem zraszaj liście.", 
+                light: "Jasne, rozproszone. Unikaj słońca.", 
+                desc: "Monstera to klasyk stylu urban jungle. Wymaga podpory (palik kokosowy). Pamiętaj o przecieraniu liści z kurzu wilgotną szmatką – dzięki temu roślina lepiej oddycha. Najczęstszy błąd: przelanie prowadzące do czarnych plam na liściach.", 
+                img: "https://images.pexels.com/photos/6597437/pexels-photo-6597437.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            },
+            { 
+                id: 2, name: "Sansewieria (Wężownica)", difficulty: "Dla początkujących", 
+                water: "Oszczędnie, co 2-3 tygodnie. Zimą rzadziej.", 
+                light: "Każde stanowisko – od cienia po słońce.", 
+                desc: "Roślina niemal niezniszczalna. Idealna do sypialni, ponieważ oczyszcza powietrze z toksyn i produkuje tlen w nocy. Magazynuje wodę w liściach, więc wybaczy zapominalstwo. Największy wróg: nadmiar wody w środku rozety liściowej.", 
+                img: "https://images.pexels.com/photos/5858235/pexels-photo-5858235.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            },
+            { 
+                id: 3, name: "Storczyk (Phalaenopsis)", difficulty: "Średnia", 
+                water: "Namaczaj doniczkę przez 15 min raz w tygodniu.", 
+                light: "Bardzo jasne, ale nie bezpośrednie słońce.", 
+                desc: "Najważniejsze to nie podlewać 'z góry'. Korzenie muszą mieć dostęp do światła (używaj przezroczystych doniczek). Po przekwitnięciu nie obcinaj pędu, dopóki sam nie uschnie – może puścić nowe pąki.", 
+                img: "https://images.pexels.com/photos/1035910/pexels-photo-1035910.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            },
+            { 
+                id: 4, name: "Zamiokulkas", difficulty: "Bardzo łatwa", 
+                water: "Raz na miesiąc. Lepiej przesuszyć niż przelać.", 
+                light: "Cieniste lub półcieniste. Nie lubi słońca.", 
+                desc: "Roślina 'żelazna'. Posiada podziemne bulwy magazynujące wodę. Idealna do ciemnych przedpokojów. Jeśli liście żółkną, to znak, że wody jest za dużo. Nawozić rzadko, raz na 2 miesiące.", 
+                img: "https://images.pexels.com/photos/7513165/pexels-photo-7513165.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            },
+            { 
+                id: 5, name: "Skrzydłokwiat", difficulty: "Łatwa", 
+                water: "Często, ziemia musi być stale wilgotna.", 
+                light: "Półcień. Bezpośrednie słońce parzy liście.", 
+                desc: "Naturalny filtr powietrza. Gdy liście 'mdleją' i opadają – roślina krzyczy, że chce pić. Kocha zraszanie. Bardzo wrażliwa na przeciągi i dym papierosowy.", 
+                img: "https://images.pexels.com/photos/4505171/pexels-photo-4505171.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            },
+            { 
+                id: 6, name: "Aloes zwyczajny", difficulty: "Bardzo łatwa", 
+                water: "Raz na 2-3 tygodnie. Sukkulent.", 
+                light: "Słoneczne parapety, południowe okna.", 
+                desc: "Roślina lecznicza i dekoracyjna. Miąższ z liści łagodzi oparzenia. Wymaga przepuszczalnej ziemi (do kaktusów). Zimą najlepiej trzymać go w chłodniejszym miejscu i prawie nie podlewać.", 
+                img: "https://images.pexels.com/photos/5945904/pexels-photo-5945904.jpeg?auto=compress&cs=tinysrgb&w=600" 
+            }
+        ];
+
+        let myJungle = JSON.parse(localStorage.getItem('myJungle')) || [];
+
+        function changeSection(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('main-header').style.display = (id === 'home') ? 'block' : 'none';
+            if (id === 'jungle') renderJungle();
+            renderPlants();
+        }
+
+        // --- NAPRAWIONA WYSZUKIWARKA ---
+        function renderPlants(filter = "") {
+            const grid = document.getElementById('plantGrid');
+            const noRes = document.getElementById('noResults');
+            grid.innerHTML = "";
+            
+            const filtered = plants.filter(p => 
+                p.name.toLowerCase().includes(filter.toLowerCase()) || 
+                p.desc.toLowerCase().includes(filter.toLowerCase()) ||
+                p.difficulty.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                noRes.classList.remove('hidden');
+            } else {
+                noRes.classList.add('hidden');
+                filtered.forEach(p => {
+                    grid.innerHTML += `
+                        <div class="plant-card bg-white rounded-[32px] shadow-lg overflow-hidden flex flex-col h-full" onclick="openDetails(${p.id})">
+                            <div class="relative">
+                                <img src="${p.img}" class="w-full h-64 object-cover">
+                                <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-black uppercase text-emerald-800">
+                                    ${p.difficulty}
+                                </div>
+                            </div>
+                            <div class="p-8 flex flex-col flex-grow">
+                                <h3 class="font-extrabold text-2xl text-emerald-950 mb-3">${p.name}</h3>
+                                <p class="text-gray-500 text-sm line-clamp-2 mb-6">${p.desc}</p>
+                                <button class="mt-auto w-full py-3 rounded-2xl bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 hover:bg-emerald-600 hover:text-white transition">
+                                    Karta pielęgnacji
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function searchPlant() {
+            const val = document.getElementById('searchInput').value;
+            renderPlants(val);
+        }
+
+        function openDetails(id) {
+            const p = plants.find(item => item.id === id);
+            document.getElementById('modalImg').src = p.img;
+            document.getElementById('modalName').innerText = p.name;
+            document.getElementById('modalDifficulty').innerText = p.difficulty;
+            document.getElementById('modalWater').innerText = p.water;
+            document.getElementById('modalLight').innerText = p.light;
+            document.getElementById('modalDesc').innerText = p.desc;
+            
+            const btn = document.getElementById('addBtnAction');
+            btn.onclick = (e) => { e.stopPropagation(); addToJungle(p.id); };
+            
+            document.getElementById('detailsModal').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('detailsModal').classList.remove('active'); }
+
+        function addToJungle(id) {
+            if(!myJungle.find(x => x.id === id)) {
+                myJungle.push(plants.find(x => x.id === id));
+                localStorage.setItem('myJungle', JSON.stringify(myJungle));
+                alert("Dodano do Twojej kolekcji!");
+                closeModal();
+            } else { alert("Roślina jest już w kolekcji."); }
+        }
+
+        function renderJungle() {
+            const grid = document.getElementById('jungleGrid');
+            grid.innerHTML = myJungle.length ? "" : "<p class='col-span-full py-24 text-emerald-300 font-bold'>Twoja domowa dżungla czeka na pierwszą roślinę.</p>";
+            myJungle.forEach(p => {
+                grid.innerHTML += `
+                    <div class="bg-white p-6 rounded-[30px] shadow-xl flex items-center gap-6 border-l-[10px] border-emerald-500">
+                        <img src="${p.img}" class="w-24 h-24 rounded-2xl object-cover shadow-md">
+                        <div class="text-left flex-1">
+                            <h3 class="font-black text-xl text-emerald-900">${p.name}</h3>
+                            <button onclick="removeFromJungle(${p.id})" class="text-red-400 text-xs font-bold mt-2 uppercase tracking-tighter">Usuń z dżungli ✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function removeFromJungle(id) {
+            myJungle = myJungle.filter(x => x.id !== id);
+            localStorage.setItem('myJungle', JSON.stringify(myJungle));
+            renderJungle();
+        }
+
+        // --- SKANER I SYMULACJA ---
+        let videoStream = null;
+        async function startCamera() {
+            const video = document.getElementById('video');
+            const msg = document.getElementById('camMessage');
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = videoStream;
+                msg.classList.add('hidden');
+                document.getElementById('scanLine').classList.remove('hidden');
+            } catch(e) {
+                alert("Nie można uruchomić kamery lokalnie. Użyj trybu DEMO.");
+            }
+        }
+
+        function simulateScan() {
+            document.getElementById('scanLine').classList.remove('hidden');
+            setTimeout(() => {
+                const random = plants[Math.floor(Math.random() * plants.length)];
+                alert("Zakończono analizę AI! Rozpoznano: " + random.name);
+                changeSection('home');
+                document.getElementById('searchInput').value = random.name;
+                renderPlants(random.name);
+                document.getElementById('scanLine').classList.add('hidden');
+            }, 3000);
+        }
+
+        // Start aplikacji
+        renderPlants();
+    </script>
+</body>
+</html>
